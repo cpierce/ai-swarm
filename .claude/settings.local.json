@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ssh:*)",
+      "WebSearch",
+      "WebFetch(domain:forums.developer.nvidia.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(curl:*)",
+      "Bash(python3:*)",
+      "Bash(ping:*)",
+      "Bash(API=\"https://172.16.3.1/proxy/network/api/s/default\")",
+      "Bash(KEY=\"X-API-KEY: 9y1Hc54WkzyEA0QixRJzcYd3_5a9EcW4\")",
+      "Bash(for host in 172.16.2.7 172.16.2.8 172.16.2.9 172.16.2.10 172.16.2.11 172.16.2.12 172.16.2.13 172.16.2.14)",
+      "Bash(do:*)",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(for:*)",
+      "Bash(kubectl get:*)",
+      "Bash(KUBECONFIG=~/.kube/config kubectl get:*)",
+      "Bash(KUBECONFIG=~/.kube/config kubectl:*)",
+      "Bash(gemini \"Create an HTML5 page for a WiFi Signal Dashboard. Include: 1\\) A header with title ''Network Signal Monitor'', 2\\) A container div with id ''clients-grid'' for WiFi client cards, 3\\) Include Chart.js from CDN, 4\\) A script tag placeholder for app.js, 5\\) Link to styles.css. Use semantic HTML. Only output the HTML code, no explanation.\")",
+      "Bash(opencode \"Create JavaScript \\(app.js\\) that: 1\\) Fetches /api/wifi-clients every 3 seconds, 2\\) For each client creates/updates a card in #clients-grid showing hostname, signal strength with color coding \\(green >-50dBm, yellow >-70dBm, red worse\\), rssi, channel, essid, ap_name, 3\\) Uses a small bar chart per card showing signal history \\(last 20 readings\\), 4\\) Remove cards for clients not in latest response. Use vanilla JS, no frameworks. Only output the JavaScript code, no explanation.\")",
+      "Bash(opencode:*)",
+      "Bash(gemini \"Improve this HTML for mobile: Add viewport meta, hamburger menu icon, touch-friendly spacing, pull-to-refresh hint. Keep it minimal. Output only HTML code:\n\n<!DOCTYPE html>\n<html lang=\"\"en\"\">\n<head>\n    <meta charset=\"\"UTF-8\"\">\n    <title>Network Signal Monitor</title>\n    <link rel=\"\"stylesheet\"\" href=\"\"styles.css\"\">\n</head>\n<body>\n    <header><h1>Network Signal Monitor</h1></header>\n    <main><div id=\"\"clients-grid\"\"></div></main>\n    <script src=\"\"app.js\"\"></script>\n</body>\n</html>\")",
+      "Bash(nvim:*)",
+      "Bash(git fetch:*)",
+      "Bash(git checkout:*)",
+      "Bash(nc:*)",
+      "Bash(PGPASSWORD=ai_worker_2026 psql:*)",
+      "Bash(brew list:*)",
+      "Bash(kubectl exec -n ai-workers deployment/n8n -- sh -c \"nc -zw2 172.16.2.205 6379 && echo ''Redis OK'' || echo ''Redis FAIL''\")",
+      "Bash(kubectl exec -n ai-workers deployment/n8n -- sh -c \"nc -zw2 172.16.2.16 5432 && echo ''PostgreSQL OK'' || echo ''PostgreSQL FAIL''\")",
+      "Bash(printf 'SET task:current \"\"{\\\\\"\"id\\\\\"\":\\\\\"\"task-001\\\\\"\",\\\\\"\"objective\\\\\"\":\\\\\"\"apt update and upgrade all servers\\\\\"\",\\\\\"\"status\\\\\"\":\\\\\"\"in_progress\\\\\"\",\\\\\"\"created_at\\\\\"\":\\\\\"\"2026-01-28T19:00:00Z\\\\\"\"}\\\\r\\\\n')",
+      "Bash(printf:*)",
+      "Bash(kubectl exec:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

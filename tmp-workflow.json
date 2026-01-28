@@ -1,0 +1,246 @@
+{
+  "name": "Siler pods command + Destiny confirm",
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "path": "local-ai",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "68409D3C-3AD6-44A5-8334-E03EC0DA17C6"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = items[0]?.json?.body || {};\nconst question = body.question || '';\nconst providedId = body.conversation_id || body.conversationId || '';\nconst conversationId = providedId || (Date.now().toString(36) + Math.random().toString(36).slice(2, 8));\nconst history = Array.isArray(body.history) ? body.history : [];\nlet historyText = '';\nfor (const entry of history) {\n  if (entry && entry.role && entry.content) {\n    historyText += entry.role + ': ' + entry.content + '\\n';\n  }\n}\nhistoryText = historyText.trim();\nreturn [{ json: { question, conversation_id: conversationId, historyText, history } }];"
+      },
+      "id": "8",
+      "name": "Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.16.2.203:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen2.5:3b-instruct-q4_K_M\", prompt: \"You are Siler. Given the conversation history and the new user request, return JSON only: either {\\\"type\\\":\\\"question\\\",\\\"question\\\":\\\"...\\\"} if clarification is needed, or {\\\"type\\\":\\\"answer\\\",\\\"answer\\\":\\\"...\\\"} with the best response. No extra text.\\nHistory:\\n\" + ($json.historyText || \"\") + \"\\nUser: \" + ($json.question || \"\"), stream: false }) }}",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Siler A",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.16.2.203:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen2.5:3b-instruct-q4_K_M\", prompt: \"You are Siler. Given the conversation history and the new user request, return JSON only: either {\\\"type\\\":\\\"question\\\",\\\"question\\\":\\\"...\\\"} if clarification is needed, or {\\\"type\\\":\\\"answer\\\",\\\"answer\\\":\\\"...\\\"} with the best response. No extra text.\\nHistory:\\n\" + ($json.historyText || \"\") + \"\\nUser: \" + ($json.question || \"\"), stream: false }) }}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Siler B",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "append"
+      },
+      "id": "4",
+      "name": "Merge",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        820,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const conversationId = items[0]?.json?.conversation_id || '';\nconst question = items[0]?.json?.question || '';\nconst history = items[0]?.json?.history || [];\nconst parsed = items.map(item => {\n  const raw = item.json.response || '';\n  try {\n    const obj = JSON.parse(raw);\n    if (obj && (obj.type === 'question' || obj.type === 'answer')) {\n      return obj;\n    }\n  } catch (e) {}\n  return { type: 'answer', answer: raw };\n});\nreturn [{ json: { conversation_id: conversationId, question, history, suggestions: parsed } }];"
+      },
+      "id": "5",
+      "name": "Collect",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://destiny.localdomain:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen3:14b\", prompt: \"You are Destiny. Choose the best final output from the suggestions. Return JSON only: either {\\\"type\\\":\\\"question\\\",\\\"question\\\":\\\"...\\\"} or {\\\"type\\\":\\\"answer\\\",\\\"answer\\\":\\\"...\\\"}. No extra text.\\nUser request: \" + ($json.question || \"\") + \"\\nSuggestions: \" + JSON.stringify($json.suggestions || []), stream: false }) }}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Destiny Confirm",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const conversationId = items[0]?.json?.conversation_id || '';\nconst question = items[0]?.json?.question || '';\nconst history = Array.isArray(items[0]?.json?.history) ? items[0].json.history : [];\nlet result = { type: 'answer', answer: items[0]?.json?.response || '' };\ntry {\n  const parsed = JSON.parse(items[0].json.response || '');\n  if (parsed && (parsed.type === 'question' || parsed.type === 'answer')) {\n    result = parsed;\n  }\n} catch (e) {}\nif (question) history.push({ role: 'user', content: question });\nif (result.type === 'answer' && result.answer) history.push({ role: 'assistant', content: result.answer });\nif (result.type === 'question' && result.question) history.push({ role: 'assistant', content: result.question });\nreturn [{ json: { conversation_id: conversationId, type: result.type, answer: result.answer, question: result.question, history } }];"
+      },
+      "id": "9",
+      "name": "Update History",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { conversation_id: $json.conversation_id, type: $json.type, answer: $json.answer, question: $json.question, history: $json.history } }}",
+        "responseCode": 200
+      },
+      "id": "7",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1660,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Siler A",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Siler B",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siler A": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Siler B": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Collect",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect": {
+      "main": [
+        [
+          {
+            "node": "Destiny Confirm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destiny Confirm": {
+      "main": [
+        [
+          {
+            "node": "Update History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update History": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

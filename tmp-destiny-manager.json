@@ -1,0 +1,298 @@
+{
+  "name": "Destiny Manager",
+  "settings": {
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "path": "destiny-manager",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "id": "1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "C0A8B9A8-EAC9-4A0D-BF8A-0EEE2F4F5341"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const body = items[0]?.json?.body || {};\nconst question = body.question || '';\nreturn [{ json: { question } }];"
+      },
+      "id": "2",
+      "name": "Prep",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://destiny.localdomain:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen3:14b\", prompt: \"You are Destiny. Decide if this task should be delegated to Siler for a draft. Delegate if it is straightforward, low-risk, or can be answered quickly by a junior. Return JSON only: {\\\"delegate\\\":true|false,\\\"reason\\\":\\\"...\\\"}. No extra text. Task: \" + ($json.question || \"\"), stream: false }) }}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Destiny Decide",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const question = items[0]?.json?.question || '';\nlet decision = { delegate: false, reason: '' };\ntry {\n  decision = JSON.parse(items[0]?.json?.response || '{}');\n} catch (e) {}\nconst delegate = decision.delegate === true;\nconst reason = decision.reason || '';\nreturn [{ json: { question, delegate, reason } }];"
+      },
+      "id": "4",
+      "name": "Parse Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.delegate}}",
+              "operation": "isTrue"
+            }
+          ]
+        }
+      },
+      "id": "5",
+      "name": "Should Delegate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://172.16.2.204:5678/webhook/siler",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ question: $json.question }) }}",
+        "options": {}
+      },
+      "id": "6",
+      "name": "Call Siler",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "language": "javaScript",
+        "jsCode": "const question = $node['Parse Decide'].json.question || '';\nconst reason = $node['Parse Decide'].json.reason || '';\nconst silerResponse = items[0]?.json?.response || '';\nreturn [{ json: { question, reason, silerResponse } }];"
+      },
+      "id": "7",
+      "name": "Prep Final (Delegated)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1460,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://destiny.localdomain:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen3:14b\", prompt: \"You are Destiny. Review the Siler draft and return the final response. Output only the final answer (multi-line allowed). Task: \" + ($json.question || \"\") + \" Draft: \" + ($json.silerResponse || \"\"), stream: false }) }}",
+        "options": {}
+      },
+      "id": "8",
+      "name": "Destiny Final (Delegated)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1660,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { response: $json.response, delegated: true, reason: $node['Parse Decide'].json.reason } }}",
+        "responseCode": 200
+      },
+      "id": "9",
+      "name": "Respond (Delegated)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1860,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://destiny.localdomain:11434/api/generate",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"qwen3:14b\", prompt: \"You are Destiny. Handle the task directly and return the final answer only (multi-line allowed). Task: \" + ($json.question || \"\"), stream: false }) }}",
+        "options": {}
+      },
+      "id": "10",
+      "name": "Destiny Direct",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "responseBody": "={{ { response: $json.response, delegated: false, reason: $node['Parse Decide'].json.reason } }}",
+        "responseCode": 200
+      },
+      "id": "11",
+      "name": "Respond (Direct)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1460,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep": {
+      "main": [
+        [
+          {
+            "node": "Destiny Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destiny Decide": {
+      "main": [
+        [
+          {
+            "node": "Parse Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Decide": {
+      "main": [
+        [
+          {
+            "node": "Should Delegate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Delegate?": {
+      "main": [
+        [
+          {
+            "node": "Call Siler",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Destiny Direct",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Siler": {
+      "main": [
+        [
+          {
+            "node": "Prep Final (Delegated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep Final (Delegated)": {
+      "main": [
+        [
+          {
+            "node": "Destiny Final (Delegated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destiny Final (Delegated)": {
+      "main": [
+        [
+          {
+            "node": "Respond (Delegated)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Destiny Direct": {
+      "main": [
+        [
+          {
+            "node": "Respond (Direct)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

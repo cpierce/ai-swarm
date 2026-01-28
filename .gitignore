@@ -1,0 +1,17 @@
+# API Keys - follow pattern: .{service}_api-key
+.*_api-key
+
+# Environment files
+.env
+.env.*
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
