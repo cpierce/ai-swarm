@@ -180,8 +180,36 @@ spec:
 
 ---
 
+## Architecture (Revised 2026-01-28)
+
+### Overview
+
+Claude Code on loki is the principal engineer / orchestrator. n8n is the middleware between Slack (user interface) and Claude Code. Claude Code decides what to do itself vs delegate to Destiny (senior) or Siler (junior).
+
+```
+User (Slack) → n8n → Claude Code (loki) → does work / delegates
+                                         ├── Destiny (qwen3:30b-a3b) via curl
+                                         ├── Siler (qwen2.5:3b) via curl
+                                         ├── kubectl for cluster ops
+                                         ├── ssh for server management
+                                         └── PostgreSQL for task memory
+              n8n ← Claude Code results
+User (Slack) ← n8n
+```
+
+### Key Design Decisions
+
+- **Claude Code is the brain** -- no separate task decomposition or worker loop workflows needed
+- **n8n is the messenger** -- handles Slack I/O and spawning Claude Code sessions on loki
+- **PostgreSQL is the memory** -- task summaries + tags let Claude recall past work across sessions
+- **Redis is hot state** -- in-flight task context and conversation threading
+- **Conversation threading** -- followup messages from Slack route to the same context so Claude can continue
+
+---
+
 ## TODO / Next Steps
 
+### Completed
 1. [x] **Deploy Junior Dev model** - "Siler" (qwen2.5:3b-instruct-q4_K_M) deployed as DaemonSet on 4 Pis (172.16.2.203:11434)
 2. [x] **Deploy n8n** - Running at 172.16.2.204:5678 (PostgreSQL on felger)
 3. [x] **Install Claude CLI on destiny** - Installed v2.1.20 at /usr/local/bin/claude
@@ -190,12 +218,34 @@ spec:
 6. [x] **Create n8n workflows** - Route between senior/junior/API models
 7. [x] **Deploy Redis** - Running at 172.16.2.205:6379 with AOF persistence on destiny `/opt/redis-data`
 8. [x] **Create ai_workers PostgreSQL database** - Schema on felger with tasks, subtasks, task_events tables (user: ai_worker)
-9. [x] **Configure local kubectl** - `~/.kube/config` pointing to `hammond.localdomain:6443` with proper TLS (SAN added)
-10. [ ] **Configure n8n Redis credentials** - Connect n8n to Redis at 172.16.2.205
-11. [ ] **Configure n8n PostgreSQL credentials** - Connect n8n to ai_workers DB on felger
-12. [ ] **Build Task Intake workflow** - POST /task/new → Destiny decomposes → store in Redis
-13. [ ] **Build Worker Loop workflows** - Siler/Destiny poll Redis for subtasks
-14. [ ] **Build Cloud Escalation workflow** - Route to Claude/GPT-4o/Gemini for critical decisions
+9. [x] **Configure local kubectl** - `~/.kube/config` on loki pointing to `hammond.localdomain:6443`
+10. [x] **SSH access from loki** - All servers accessible except fifth (needs key) and thor (port 22 refused)
+
+### Phase 1: n8n ↔ Slack Integration
+11. [ ] **Configure n8n Slack credentials** - OAuth app or bot token for Slack workspace
+12. [ ] **Build Slack → n8n trigger workflow** - Receive messages from Slack channel/DM
+13. [ ] **Build n8n → Slack response node** - Send Claude's results back to Slack thread
+
+### Phase 2: n8n ↔ Claude Code (loki)
+14. [ ] **Define loki invocation method** - How n8n spawns Claude Code on loki (SSH + `claude` CLI, or HTTP wrapper)
+15. [ ] **Build n8n → loki execution workflow** - Pass Slack message to Claude Code, capture output
+16. [ ] **Conversation threading** - Pass session/context ID so followups route to same conversation
+17. [ ] **Configure n8n Redis credentials** - Connect n8n to Redis at 172.16.2.205 for session state
+18. [ ] **Configure n8n PostgreSQL credentials** - Connect n8n to ai_workers DB on felger for task memory
+
+### Phase 3: Task Memory & Context
+19. [ ] **Task memory on completion** - Claude writes summary + tags to PostgreSQL after each task
+20. [ ] **Context recall on session start** - Query PostgreSQL for relevant past work when new task arrives
+21. [ ] **Redis session state** - Store in-flight conversation context for multi-turn interactions
+
+### Phase 4: Cloud API Keys & Escalation
+22. [ ] **Acquire cloud API keys** - `.anthropic_api-key`, `.openai_api-key`, `.gemini_api-key`
+23. [ ] **Cost tracking** - Log cloud API usage per task
+
+### Maintenance
+24. [ ] **apt update/upgrade all servers** - 14 servers still pending
+25. [ ] **Fix SSH to fifth** - Needs key added for cpierce or root
+26. [ ] **Fix SSH to thor** - Port 22 connection refused (Home Assistant host)
 
 ---
 

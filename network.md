@@ -17,18 +17,18 @@ Updated: 2026-01-28
 | Property | Value |
 |----------|-------|
 | IP | 172.16.3.1 |
-| API Key | `9y1Hc54WkzyEA0QixRJzcYd3_5a9EcW4` |
+| API Key | Stored in `.unifi_api-key` (see API Key Convention) |
 | API Endpoint | `https://172.16.3.1/proxy/network/api/s/default/` |
 
 ### Example API Calls
 ```bash
 # Get all devices
 curl -s -k https://172.16.3.1/proxy/network/api/s/default/stat/device \
-  -H "X-API-KEY: 9y1Hc54WkzyEA0QixRJzcYd3_5a9EcW4"
+  -H "X-API-KEY: $(cat .unifi_api-key)"
 
 # Get clients
 curl -s -k https://172.16.3.1/proxy/network/api/s/default/stat/sta \
-  -H "X-API-KEY: 9y1Hc54WkzyEA0QixRJzcYd3_5a9EcW4"
+  -H "X-API-KEY: $(cat .unifi_api-key)"
 ```
 
 ---
@@ -114,13 +114,13 @@ curl -s -k https://172.16.3.1/proxy/network/api/s/default/stat/sta \
 | Property | Value |
 |----------|-------|
 | URL | http://172.16.2.204:5678 |
-| API Key | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNGIzMzhkMy0zMmMxLTQ3YjgtYTEwMi04NDJjZWJkMTQwMDAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY5NTM0MDExfQ.ciPAkBEq-4lbc58AVtHGZWsnGZN2vB7iJPaF_TKa8fU` |
+| API Key | Stored in `.n8n_api-key` (see API Key Convention) |
 | Database | PostgreSQL on felger (172.16.2.16) |
 | Namespace | ai-workers |
 
 ### API Example
 ```bash
-curl -H "X-N8N-API-KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkNGIzMzhkMy0zMmMxLTQ3YjgtYTEwMi04NDJjZWJkMTQwMDAiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzY5NTM0MDExfQ.ciPAkBEq-4lbc58AVtHGZWsnGZN2vB7iJPaF_TKa8fU" \
+curl -H "X-N8N-API-KEY: $(cat .n8n_api-key)" \
   http://172.16.2.204:5678/api/v1/workflows
 ```
 
@@ -240,6 +240,18 @@ sudo dhclient -r eth0 && sudo dhclient eth0
 2. Restart kiosk: `sudo pkill -u kiosk`
 3. Check autostart: `cat /home/kiosk/.config/openbox/autostart`
 4. Check errors: `cat /home/kiosk/.xsession-errors`
+
+---
+
+## csdurant Remote Servers
+
+| Hostname | SSH | Nginx | Nginx Version | Notes |
+|----------|-----|-------|---------------|-------|
+| dakara.csdurant.com | `cpierce@dakara.csdurant.com` | active | nginx/1.24.0 (Ubuntu) | |
+| chulak.csdurant.com | `cpierce@chulak.csdurant.com -p 2022` | active | nginx/1.24.0 (Ubuntu) | Non-standard SSH port |
+| orilla.csdurant.com | `cpierce@orilla.csdurant.com` | active | nginx/1.24.0 (Ubuntu) | |
+| cheyenne.csdurant.com | `cpierce@cheyenne.csdurant.com` | active | nginx/1.24.0 (Ubuntu) | |
+| vorash.csdurant.com | `cpierce@vorash.csdurant.com` | active | nginx/1.24.0 (Ubuntu) | |
 
 ---
 
