@@ -26,6 +26,8 @@ All API keys and tokens for this project are stored as plaintext files in the pr
 **Current key files:**
 - `.unifi_api-key` - UniFi Network controller
 - `.n8n_api-key` - n8n workflow automation
+- `.slack_api-key` - AISwarm Slack bot token
+- `.ha_api-key` - Home Assistant on thor
 
 ---
 
@@ -222,30 +224,34 @@ User (Slack) ← n8n
 10. [x] **SSH access from loki** - All servers accessible except fifth (needs key) and thor (port 22 refused)
 
 ### Phase 1: n8n ↔ Slack Integration
-11. [ ] **Configure n8n Slack credentials** - OAuth app or bot token for Slack workspace
-12. [ ] **Build Slack → n8n trigger workflow** - Receive messages from Slack channel/DM
-13. [ ] **Build n8n → Slack response node** - Send Claude's results back to Slack thread
+11. [x] **Configure n8n Slack credentials** - AISwarm bot created, token in `.slack_api-key`
+12. [x] **Build Slack → n8n trigger workflow** - Webhook receives app_mention events
+13. [x] **Build n8n → Slack response node** - Replies posted to thread via HTTP Request node
 
 ### Phase 2: n8n ↔ Claude Code (loki)
-14. [ ] **Define loki invocation method** - How n8n spawns Claude Code on loki (SSH + `claude` CLI, or HTTP wrapper)
-15. [ ] **Build n8n → loki execution workflow** - Pass Slack message to Claude Code, capture output
-16. [ ] **Conversation threading** - Pass session/context ID so followups route to same conversation
-17. [ ] **Configure n8n Redis credentials** - Connect n8n to Redis at 172.16.2.205 for session state
-18. [ ] **Configure n8n PostgreSQL credentials** - Connect n8n to ai_workers DB on felger for task memory
+14. [x] **Define loki invocation method** - SSH from n8n (via Twingate) to loki, runs `claude` CLI
+15. [x] **Build n8n → loki execution workflow** - AISwarm Slack Gateway (uKJwfb35TjOsuazL) passes prompt to Claude Code, captures output
+16. [x] **Conversation threading** - Build Prompt node fetches Slack thread history and prepends as context
+17. [x] **Configure n8n Redis credentials** - Connected (credential ID `4GLRkyS2xk2B2roE`)
+18. [x] **Configure n8n PostgreSQL credentials** - Connected (credential ID `a1FtLvC6cJrb9Pmv`)
 
 ### Phase 3: Task Memory & Context
-19. [ ] **Task memory on completion** - Claude writes summary + tags to PostgreSQL after each task
-20. [ ] **Context recall on session start** - Query PostgreSQL for relevant past work when new task arrives
-21. [ ] **Redis session state** - Store in-flight conversation context for multi-turn interactions
+19. [x] **Task memory on completion** - Claude writes summary + tags to PostgreSQL after each task
+20. [x] **Context recall on session start** - Deep recall policy in CLAUDE.md, queries PostgreSQL
+21. [x] **Redis session state** - Thread context stored in Redis with 24h TTL after each response
+
+### Phase 3.5: Progress Updates
+22. [x] **Slack progress updates** - `slack-update.sh` script + n8n injects channel/thread_ts into prompt
+23. [x] **Twingate connectivity** - n8n on walter reaches loki via Twingate (muscular-dragon + slim-firefly connectors)
 
 ### Phase 4: Cloud API Keys & Escalation
-22. [ ] **Acquire cloud API keys** - `.anthropic_api-key`, `.openai_api-key`, `.gemini_api-key`
-23. [ ] **Cost tracking** - Log cloud API usage per task
+24. [ ] **Acquire cloud API keys** - `.anthropic_api-key`, `.openai_api-key`, `.gemini_api-key`
+25. [ ] **Cost tracking** - Log cloud API usage per task
 
 ### Maintenance
-24. [ ] **apt update/upgrade all servers** - 14 servers still pending
-25. [ ] **Fix SSH to fifth** - Needs key added for cpierce or root
-26. [ ] **Fix SSH to thor** - Port 22 connection refused (Home Assistant host)
+26. [x] **apt update/upgrade all servers** - 12/14 succeeded, fifth and thor blocked on SSH
+27. [ ] **Fix SSH to fifth** - Needs key added for cpierce or root
+28. [ ] **Fix SSH to thor** - Port 22 connection refused (Home Assistant host)
 
 ---
 
@@ -276,16 +282,16 @@ ssh root@hammond "kubectl get nodes"
 ```bash
 # n8n - List workflows
 curl -H "Authorization: Bearer $(cat .n8n_api-key)" \
-  http://172.16.2.204:5678/api/v1/workflows
+  https://automation.cpierce.org/api/v1/workflows
 
 # n8n - Get workflow by ID
 curl -H "Authorization: Bearer $(cat .n8n_api-key)" \
-  http://172.16.2.204:5678/api/v1/workflows/{id}
+  https://automation.cpierce.org/api/v1/workflows/{id}
 
 # n8n - Execute workflow
 curl -X POST -H "Authorization: Bearer $(cat .n8n_api-key)" \
   -H "Content-Type: application/json" \
-  http://172.16.2.204:5678/api/v1/workflows/{id}/run
+  https://automation.cpierce.org/api/v1/workflows/{id}/run
 
 # UniFi - Get connected clients
 curl -k -H "X-API-Key: $(cat .unifi_api-key)" \
@@ -324,7 +330,9 @@ All API keys are stored in the project root using the pattern: `.{service}_api-k
 | Service | File | Format | Endpoint |
 |---------|------|--------|----------|
 | UniFi Network | `.unifi_api-key` | Plain API token | `https://unifi.localdomain/api` |
-| n8n | `.n8n_api-key` | JWT Bearer token | `http://172.16.2.204:5678/api/v1` |
+| n8n | `.n8n_api-key` | API key (X-N8N-API-KEY header) | `https://automation.cpierce.org/api/v1` |
+| Slack (AISwarm bot) | `.slack_api-key` | Bot token (xoxb-...) | `https://slack.com/api` |
+| Home Assistant | `.ha_api-key` | Long-lived access token | `http://thor.localdomain:8123/api` |
 | Anthropic Claude | `.anthropic_api-key` | Plain API key | `https://api.anthropic.com/v1` |
 | OpenAI | `.openai_api-key` | Plain API key | `https://api.openai.com/v1` |
 | Google Gemini | `.gemini_api-key` | Plain API key | `https://generativelanguage.googleapis.com/v1` |
@@ -336,7 +344,7 @@ export UNIFI_API_KEY=$(cat .unifi_api-key)
 export N8N_API_KEY=$(cat .n8n_api-key)
 
 # Use with curl
-curl -H "Authorization: Bearer $(cat .n8n_api-key)" http://172.16.2.204:5678/api/v1/workflows
+curl -H "Authorization: Bearer $(cat .n8n_api-key)" https://automation.cpierce.org/api/v1/workflows
 
 # UniFi API example
 curl -H "X-API-Key: $(cat .unifi_api-key)" https://unifi.localdomain/api/s/default/stat/sta
